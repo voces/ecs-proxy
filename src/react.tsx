@@ -10,9 +10,7 @@ import { System } from "./System.ts";
 
 export const appSet = <Entity,>() => {
   /** Context that stores the current `App`. */
-  const AppContext = createContext<AppType<Entity>>(
-    newApp({ newEntity: (e) => e as Entity }),
-  );
+  const AppContext = createContext<AppType<Entity>>(null!);
 
   /** Returns the current `App` from `AppContext`. */
   const useApp = () => {
@@ -44,10 +42,10 @@ export const appSet = <Entity,>() => {
       app.lastUpdate,
     );
     const [entities, setEntities] = useState(
-      new Set<Entity & Required<Pick<Entity, K>>>(),
+      () => new Set<Entity & Required<Pick<Entity, K>>>(),
     );
     const [addedEntities, setAddedEntities] = useState(
-      new Set<Entity & Required<Pick<Entity, K>>>(),
+      () => new Set<Entity & Required<Pick<Entity, K>>>(),
     );
     const [removedEntities, setRemovedEntities] = useState(new Set<Entity>());
 
@@ -61,15 +59,23 @@ export const appSet = <Entity,>() => {
             setLastComponentRenderTime(app.lastUpdate);
           }
 
-          if (!entities.has(e)) {
+          setEntities((entities) => {
+            if (entities.has(e)) return entities;
+
             const newEntities = new Set(entities);
             newEntities.add(e);
-            setEntities(newEntities);
+
+            return newEntities;
+          });
+
+          setAddedEntities((addedEntities) => {
+            if (addedEntities.has(e)) return addedEntities;
 
             const newAddedEntities = new Set(addedEntities);
             newAddedEntities.add(e);
-            setAddedEntities(newAddedEntities);
-          }
+
+            return newAddedEntities;
+          });
 
           systemDefinition.onAdd?.(e);
         },
@@ -80,17 +86,27 @@ export const appSet = <Entity,>() => {
             setLastComponentRenderTime(app.lastUpdate);
           }
 
-          // deno-lint-ignore no-explicit-any
-          if (entities.has(e as any)) {
+          setEntities((entities) => {
+            // deno-lint-ignore no-explicit-any
+            if (!entities.has(e as any)) return entities;
+
             const newEntities = new Set(entities);
             // deno-lint-ignore no-explicit-any
             newEntities.delete(e as any);
-            setEntities(newEntities);
+
+            return newEntities;
+          });
+
+          setRemovedEntities((removedEntities) => {
+            // deno-lint-ignore no-explicit-any
+            if (removedEntities.has(e as any)) return removedEntities;
 
             const newRemovedEntities = new Set(removedEntities);
-            newRemovedEntities.delete(e);
-            setRemovedEntities(newRemovedEntities);
-          }
+            // deno-lint-ignore no-explicit-any
+            newRemovedEntities.add(e as any);
+
+            return newRemovedEntities;
+          });
 
           systemDefinition.onRemove?.(e);
         },
@@ -102,9 +118,11 @@ export const appSet = <Entity,>() => {
               setLastComponentRenderTime(app.lastUpdate);
             }
 
-            const newEntities = new Set(entities);
-            newEntities.add(e); // ensure entity in set
-            setEntities(newEntities);
+            setEntities((entities) => {
+              const newEntities = new Set(entities);
+              newEntities.add(e);
+              return newEntities;
+            });
 
             systemDefinition.onChange?.(e);
           }
