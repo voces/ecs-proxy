@@ -1,8 +1,12 @@
 import { System } from "./System.ts";
+import { Mutable } from "./types.ts";
 
 export type App<Entity> = {
   /** Invoke an update. */
   update: (delta?: number, next?: number) => void;
+
+  /** Last time update was called. */
+  lastUpdate: number;
 
   /** Handler that receives entity changes and notifies systems. */
   onEntityPropChange: (entity: Entity, property: keyof Entity) => void;
@@ -15,7 +19,7 @@ export type App<Entity> = {
 
   /** Add a system to the App. */
   addSystem: <K extends keyof Entity>(
-    partial: System<Entity, K>,
+    partial: Partial<System<Entity, K>>,
   ) => System<Entity, K>;
 
   /** Remove a system from the App. */
@@ -23,6 +27,22 @@ export type App<Entity> = {
 
   /** Initialize a new entity */
   newEntity: (partialEntity: Partial<Entity>) => Entity;
+
+  /** Helper to detect entity changes. */
+  trackProp: <K extends keyof Entity>(
+    entity: Entity,
+    prop: K,
+    propertyDescriptor?: PropertyDescriptor,
+  ) => void;
+
+  /** All entities added to the app. */
+  readonly entities: Record<string, Entity>;
+
+  /** All systems added to the app. */
+  readonly systems: Set<System<Entity, keyof Entity>>;
+
+  /** Mapping between entity properties and systems. */
+  readonly propMap: { [K in keyof Entity]?: System<Entity, K>[] };
 };
 
 export const newApp = <Entity extends { entityId: string }>(
@@ -31,29 +51,29 @@ export const newApp = <Entity extends { entityId: string }>(
   },
 ): App<Entity> => {
   const app = partialApp as App<Entity>;
-  const entities: Record<string, Entity> = {};
-  const childPropMap: { [K in keyof Entity]?: System<Entity, K>[] } = {};
 
-  const systems = new Set<System<Entity, keyof Entity>>();
-  const systemsEntities = new Map<System<Entity, keyof Entity>, Set<Entity>>();
+  {
+    const mutApp = app as Mutable<App<Entity>>;
+    mutApp.entities ??= {};
+    mutApp.propMap ??= {};
+    mutApp.systems = new Set();
+  }
 
   if (!app.update) {
-    let lastUpdate = Date.now() / 1000;
+    app.lastUpdate = Date.now() / 1000;
     app.update = (delta?: number, next?: number) => {
       if (delta === undefined) {
         if (next === undefined) next = Date.now() / 1000;
-        delta = next - lastUpdate;
-      } else if (next === undefined) next = lastUpdate + delta;
-      lastUpdate = next;
+        delta = next - app.lastUpdate;
+      } else if (next === undefined) next = app.lastUpdate + delta;
+      app.lastUpdate = next;
 
-      for (const system of systems) {
+      for (const system of app.systems) {
         system.update?.(delta, next);
 
-        const entities = systemsEntities.get(system);
-        if (system.updateChild && entities) {
-          for (const child of entities) {
-            // deno-lint-ignore no-explicit-any
-            system.updateChild(child as any, delta, next);
+        if (system.updateChild) {
+          for (const child of system.entities) {
+            system.updateChild(child, delta, next);
           }
         }
       }
@@ -62,32 +82,30 @@ export const newApp = <Entity extends { entityId: string }>(
 
   if (!app.delete) {
     app.delete = (child) => {
-      //   if (child.beforeDelete?.(child) === false) return;
-
-      for (const system of systems) {
-        const entities = systemsEntities.get(system);
-        if (entities?.has(child)) {
-          entities.delete(child);
+      for (const system of app.systems) {
+        // deno-lint-ignore no-explicit-any
+        if (system.entities.has(child as any)) {
+          // deno-lint-ignore no-explicit-any
+          system.entities.delete(child as any);
           system.onRemove?.(child);
         }
       }
 
-      delete entities[child.entityId];
+      delete app.entities[child.entityId];
     };
   }
 
   if (!app.onEntityPropChange) {
     app.onEntityPropChange = (entity, property) => {
       // Ignore changes on entities not added
-      if (!entities[entity.entityId]) return;
+      if (!app.entities[entity.entityId]) return;
 
-      const systems = childPropMap[property];
+      const systems = app.propMap[property];
       if (systems) {
         for (const system of systems!) {
-          const entities = systemsEntities.get(system);
-
           // Fast path: mutating a single value and other values are good
-          if (entities?.has(entity)) {
+          // deno-lint-ignore no-explicit-any
+          if (system.entities.has(entity as any)) {
             // Just a mutation
             if (entity[property] != null) {
               // deno-lint-ignore no-explicit-any
@@ -95,7 +113,8 @@ export const newApp = <Entity extends { entityId: string }>(
 
               // We nulled a required prop
             } else {
-              entities.delete(entity);
+              // deno-lint-ignore no-explicit-any
+              system.entities.delete(entity as any);
               system.onRemove?.(entity);
             }
 
@@ -107,7 +126,8 @@ export const newApp = <Entity extends { entityId: string }>(
           const next = system.props?.every((prop) => entity[prop] != null) ??
             false;
           if (next) {
-            entities?.add(entity);
+            // deno-lint-ignore no-explicit-any
+            system.entities.add(entity as any);
             // deno-lint-ignore no-explicit-any
             system.onAdd?.(entity as any);
           }
@@ -128,25 +148,26 @@ export const newApp = <Entity extends { entityId: string }>(
         );
 
       // Don't add the same entity multiple times
-      if (entities[entity.entityId]) {
+      if (app.entities[entity.entityId]) {
         console.warn("Adding already added entity", entity.entityId);
-        return entities[entity.entityId];
+        return app.entities[entity.entityId];
       }
 
-      entities[entity.entityId] = entity;
+      app.entities[entity.entityId] = entity;
 
       // Add entity to existing systems
       const systems = Object.keys(entity).flatMap((prop) =>
-        childPropMap[prop as keyof Entity] ?? []
+        app.propMap[prop as keyof Entity] ?? []
       );
       for (const system of systems) {
         if (system) {
-          const entities = systemsEntities.get(system);
           if (
-            entities && system.props?.every((prop) => entity[prop] != null) &&
-            !entities.has(entity)
+            system.props?.every((prop) => entity[prop] != null) &&
+            // deno-lint-ignore no-explicit-any
+            !system.entities.has(entity as any)
           ) {
-            entities.add(entity);
+            // deno-lint-ignore no-explicit-any
+            system.entities.add(entity as any);
             // deno-lint-ignore no-explicit-any
             system.onAdd?.(entity as any);
           }
@@ -159,44 +180,42 @@ export const newApp = <Entity extends { entityId: string }>(
 
   if (!app.addSystem) {
     app.addSystem = <K extends keyof Entity>(
-      partialSystem: System<Entity, K>,
+      partialSystem: Partial<System<Entity, K>>,
     ) => {
       // Allow direct adding of plain objects
       const system = partialSystem as System<Entity, keyof Entity>;
-      const systemEntities = new Set<Entity>();
-      systemsEntities.set(system, systemEntities);
+      system.entities ??= new Set();
 
       // System has children;
       if (system.props) {
         for (const prop of system.props) {
-          if (!childPropMap[prop]) childPropMap[prop] = [];
-          childPropMap[prop]!.push(system);
+          if (!app.propMap[prop]) app.propMap[prop] = [];
+          app.propMap[prop]!.push(system);
         }
 
         // Add existing matching children
-        for (const entityId in entities) {
-          const entity = entities[entityId];
+        for (const entityId in app.entities) {
+          const entity = app.entities[entityId];
           if (system.props.every((prop) => entity[prop] != null)) {
-            systemEntities.add(entity);
+            // deno-lint-ignore no-explicit-any
+            system.entities.add(entity as any);
             // deno-lint-ignore no-explicit-any
             system.onAdd?.(entity as any);
           }
         }
       }
 
-      systems.add(system);
+      app.systems.add(system);
 
       return system as System<Entity, K>;
     };
   }
 
   if (!app.deleteSystem) {
-    app.deleteSystem = (system) => {
-      systemsEntities.delete(system);
-
+    app.deleteSystem = <K extends keyof Entity>(system: System<Entity, K>) => {
       if (system.props) {
         for (const prop of system.props) {
-          const systems = childPropMap[prop];
+          const systems = app.propMap[prop];
           if (systems) {
             const index = systems.indexOf(system);
             if (index >= 0) systems.splice(index);
@@ -204,7 +223,28 @@ export const newApp = <Entity extends { entityId: string }>(
         }
       }
 
-      systems.delete(system);
+      // deno-lint-ignore no-explicit-any
+      app.systems.delete(system as any);
+    };
+  }
+
+  if (!app.trackProp) {
+    app.trackProp = <Prop extends keyof Entity>(
+      entity: Entity,
+      prop: Prop,
+      propertyDescriptor?: PropertyDescriptor,
+    ) => {
+      let value: Entity[Prop] = entity[prop];
+      Object.defineProperty(entity, prop, {
+        enumerable: true,
+        get: () => value,
+        set: (newValue) => {
+          const changed = newValue !== value;
+          value = newValue;
+          if (changed) app.onEntityPropChange(entity, prop);
+        },
+        ...propertyDescriptor,
+      });
     };
   }
 

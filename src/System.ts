@@ -26,4 +26,6 @@ export type System<Entity, Props extends keyof Entity> = {
     delta: number,
     time: number,
   ) => void;
+
+  entities: Set<Entity & Required<Pick<Entity, Props>>>;
 };

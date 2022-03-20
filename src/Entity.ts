@@ -1,12 +1,12 @@
-import { currentApp } from "./appContext.ts";
+import { App } from "./App.ts";
 
 export const trackProp = <Entity, Prop extends keyof Entity>(
+  app: App<Entity>,
   entity: Entity,
   prop: Prop,
   propertyDescriptor?: PropertyDescriptor,
 ) => {
   let value: Entity[Prop] | undefined = entity[prop];
-  const app = currentApp<Entity>();
   Object.defineProperty(entity, prop, {
     enumerable: true,
     get: () => value,
