@@ -49,13 +49,15 @@ export const appSet = <Entity,>() => {
       new Set<Entity & Required<Pick<Entity, K>>>(),
     );
 
-    const [entities, setEntities] = useState(
-      () => new Set<Entity & Required<Pick<Entity, K>>>(),
+    const [entities, setEntities] = useState<
+      ReadonlySet<Entity & Required<Pick<Entity, K>>>
+    >(() => new Set<Entity & Required<Pick<Entity, K>>>());
+    const [addedEntities, setAddedEntities] = useState<
+      ReadonlySet<Entity & Required<Pick<Entity, K>>>
+    >(() => new Set<Entity & Required<Pick<Entity, K>>>());
+    const [removedEntities, setRemovedEntities] = useState<ReadonlySet<Entity>>(
+      new Set<Entity>(),
     );
-    const [addedEntities, setAddedEntities] = useState(
-      () => new Set<Entity & Required<Pick<Entity, K>>>(),
-    );
-    const [removedEntities, setRemovedEntities] = useState(new Set<Entity>());
 
     useEffect(() => {
       const trackSystem = app.addSystem({
@@ -88,10 +90,12 @@ export const appSet = <Entity,>() => {
       const tickSystem = app.addSystem({
         update: () => {
           if (changed.current === true) {
+            changed.current = false;
+
             setEntities((entities) => {
               const temp = nextEntities.current;
               nextEntities.current = new Set(entities);
-              return nextEntities.current;
+              return temp;
             });
 
             setAddedEntities(addedEntitiesRef.current);
