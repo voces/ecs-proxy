@@ -3,6 +3,7 @@ import React, {
   FC,
   useContext,
   useEffect,
+  useRef,
   useState,
 } from "react";
 import { App as AppType, newApp } from "./App.ts";
@@ -38,9 +39,16 @@ export const appSet = <Entity,>() => {
     refreshOnEntityUpdate = false,
   ) => {
     const app = useApp();
-    const [lastComponentRenderTime, setLastComponentRenderTime] = useState(
-      app.lastUpdate,
+
+    const changed = useRef(false);
+    const nextEntities = useRef(new Set<Entity & Required<Pick<Entity, K>>>());
+    const addedEntitiesRef = useRef(
+      new Set<Entity & Required<Pick<Entity, K>>>(),
     );
+    const removedEntitiesRef = useRef(
+      new Set<Entity & Required<Pick<Entity, K>>>(),
+    );
+
     const [entities, setEntities] = useState(
       () => new Set<Entity & Required<Pick<Entity, K>>>(),
     );
@@ -50,86 +58,55 @@ export const appSet = <Entity,>() => {
     const [removedEntities, setRemovedEntities] = useState(new Set<Entity>());
 
     useEffect(() => {
-      const system = app.addSystem({
+      const trackSystem = app.addSystem({
         ...systemDefinition,
         onAdd: (e) => {
-          if (lastComponentRenderTime !== app.lastUpdate) {
-            setAddedEntities(new Set());
-            setRemovedEntities(new Set());
-            setLastComponentRenderTime(app.lastUpdate);
-          }
-
-          setEntities((entities) => {
-            if (entities.has(e)) return entities;
-
-            const newEntities = new Set(entities);
-            newEntities.add(e);
-
-            return newEntities;
-          });
-
-          setAddedEntities((addedEntities) => {
-            if (addedEntities.has(e)) return addedEntities;
-
-            const newAddedEntities = new Set(addedEntities);
-            newAddedEntities.add(e);
-
-            return newAddedEntities;
-          });
-
+          changed.current = true;
+          nextEntities.current.add(e);
+          addedEntitiesRef.current.add(e);
+          removedEntitiesRef.current.delete(e);
           systemDefinition.onAdd?.(e);
         },
         onRemove: (e) => {
-          if (lastComponentRenderTime !== app.lastUpdate) {
-            setAddedEntities(new Set());
-            setRemovedEntities(new Set());
-            setLastComponentRenderTime(app.lastUpdate);
-          }
-
-          setEntities((entities) => {
-            // deno-lint-ignore no-explicit-any
-            if (!entities.has(e as any)) return entities;
-
-            const newEntities = new Set(entities);
-            // deno-lint-ignore no-explicit-any
-            newEntities.delete(e as any);
-
-            return newEntities;
-          });
-
-          setRemovedEntities((removedEntities) => {
-            // deno-lint-ignore no-explicit-any
-            if (removedEntities.has(e as any)) return removedEntities;
-
-            const newRemovedEntities = new Set(removedEntities);
-            // deno-lint-ignore no-explicit-any
-            newRemovedEntities.add(e as any);
-
-            return newRemovedEntities;
-          });
-
+          changed.current = true;
+          // deno-lint-ignore no-explicit-any
+          nextEntities.current.delete(e as any);
+          // deno-lint-ignore no-explicit-any
+          addedEntitiesRef.current.delete(e as any);
+          // deno-lint-ignore no-explicit-any
+          removedEntitiesRef.current.add(e as any);
           systemDefinition.onRemove?.(e);
         },
         onChange: refreshOnEntityUpdate
           ? (e) => {
-            if (lastComponentRenderTime !== app.lastUpdate) {
-              setAddedEntities(new Set());
-              setRemovedEntities(new Set());
-              setLastComponentRenderTime(app.lastUpdate);
-            }
-
-            setEntities((entities) => {
-              const newEntities = new Set(entities);
-              newEntities.add(e);
-              return newEntities;
-            });
-
+            changed.current = true;
             systemDefinition.onChange?.(e);
           }
           : undefined,
       });
 
-      return () => app.deleteSystem(system);
+      const tickSystem = app.addSystem({
+        update: () => {
+          if (changed.current === true) {
+            setEntities((entities) => {
+              const temp = nextEntities.current;
+              nextEntities.current = new Set(entities);
+              return nextEntities.current;
+            });
+
+            setAddedEntities(addedEntitiesRef.current);
+            addedEntitiesRef.current = new Set();
+
+            setRemovedEntities(removedEntitiesRef.current);
+            removedEntitiesRef.current = new Set();
+          }
+        },
+      });
+
+      return () => {
+        app.deleteSystem(trackSystem);
+        app.deleteSystem(tickSystem);
+      };
     }, systemDefinition.props ?? []);
 
     return { entities, addedEntities, removedEntities };
