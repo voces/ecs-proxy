@@ -50,7 +50,7 @@ const apps = new WeakMap<App<any>>();
 
 export const newApp = <Entity>(
   partialApp: Partial<App<Entity>> & {
-    newEntity: (partialEntity: Partial<Entity>) => Entity;
+    newEntity: (partialEntity: Partial<Entity>, app: App<Entity>) => Entity;
   },
 ): App<Entity> => {
   const app = partialApp as App<Entity>;

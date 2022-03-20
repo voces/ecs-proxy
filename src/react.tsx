@@ -103,7 +103,10 @@ export const appSet = <Entity,>() => {
 
   const App: FC<
     Partial<AppType<Entity>> & {
-      newEntity: (partialEntity: Partial<Entity>) => Entity;
+      newEntity: (
+        partialEntity: Partial<Entity>,
+        app: AppType<Entity>,
+      ) => Entity;
     }
   > = ({ children, ...rest }) => {
     const [app] = useState(() => newApp(rest));
