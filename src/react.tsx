@@ -8,14 +8,9 @@ import React, {
 import { App as AppType, newApp } from "./App.ts";
 import { System } from "./System.ts";
 
-export const appSet = <Entity extends { entityId: string }>() => {
+export const appSet = <Entity,>() => {
   const AppContext = createContext<AppType<Entity>>(
-    newApp({
-      newEntity: (e) => {
-        if (!e.entityId) e.entityId = crypto.randomUUID();
-        return e as Entity;
-      },
-    }),
+    newApp({ newEntity: (e) => e as Entity }),
   );
 
   const useSystem = <K extends keyof Entity>(

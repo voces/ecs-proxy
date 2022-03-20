@@ -25,8 +25,8 @@ export type App<Entity> = {
   /** Remove a system from the App. */
   deleteSystem: <K extends keyof Entity>(system: System<Entity, K>) => void;
 
-  /** Initialize a new entity */
-  newEntity: (partialEntity: Partial<Entity>) => Entity;
+  /** Initialize a new entity. `partialEntity` should modified and returned. */
+  newEntity: (partialEntity: Partial<Entity>, app: App<Entity>) => Entity;
 
   /** Helper to detect entity changes. */
   trackProp: <K extends keyof Entity>(
@@ -36,7 +36,7 @@ export type App<Entity> = {
   ) => void;
 
   /** All entities added to the app. */
-  readonly entities: Record<string, Entity>;
+  readonly entities: Set<Entity>;
 
   /** All systems added to the app. */
   readonly systems: Set<System<Entity, keyof Entity>>;
@@ -45,16 +45,21 @@ export type App<Entity> = {
   readonly propMap: { [K in keyof Entity]?: System<Entity, K>[] };
 };
 
-export const newApp = <Entity extends { entityId: string }>(
+// deno-lint-ignore no-explicit-any
+const apps = new WeakMap<App<any>>();
+
+export const newApp = <Entity>(
   partialApp: Partial<App<Entity>> & {
     newEntity: (partialEntity: Partial<Entity>) => Entity;
   },
 ): App<Entity> => {
   const app = partialApp as App<Entity>;
 
+  if (apps.has(app)) return app;
+
   {
     const mutApp = app as Mutable<App<Entity>>;
-    mutApp.entities ??= {};
+    mutApp.entities ??= new Set();
     mutApp.propMap ??= {};
     mutApp.systems = new Set();
   }
@@ -91,14 +96,14 @@ export const newApp = <Entity extends { entityId: string }>(
         }
       }
 
-      delete app.entities[child.entityId];
+      app.entities.delete(child);
     };
   }
 
   if (!app.onEntityPropChange) {
     app.onEntityPropChange = (entity, property) => {
       // Ignore changes on entities not added
-      if (!app.entities[entity.entityId]) return;
+      if (!app.entities.has(entity)) return;
 
       const systems = app.propMap[property];
       if (systems) {
@@ -138,22 +143,14 @@ export const newApp = <Entity extends { entityId: string }>(
 
   if (!app.add) {
     app.add = (partialEntity) => {
-      // Allow direct adding of plain objects
-      const entity = "isEntity" in partialEntity
-        ? partialEntity as Entity
-        : app.newEntity(
-          Object.assign(partialEntity, {
-            entityId: partialEntity.entityId ?? crypto.randomUUID(),
-          }),
-        );
-
       // Don't add the same entity multiple times
-      if (app.entities[entity.entityId]) {
-        console.warn("Adding already added entity", entity.entityId);
-        return app.entities[entity.entityId];
+      if (app.entities.has(partialEntity as Entity)) {
+        return partialEntity as Entity;
       }
 
-      app.entities[entity.entityId] = entity;
+      const entity = app.newEntity(partialEntity, app);
+
+      app.entities.add(entity);
 
       // Add entity to existing systems
       const systems = Object.keys(entity).flatMap((prop) =>
@@ -194,8 +191,7 @@ export const newApp = <Entity extends { entityId: string }>(
         }
 
         // Add existing matching children
-        for (const entityId in app.entities) {
-          const entity = app.entities[entityId];
+        for (const entity of app.entities) {
           if (system.props.every((prop) => entity[prop] != null)) {
             // deno-lint-ignore no-explicit-any
             system.entities.add(entity as any);
@@ -237,6 +233,7 @@ export const newApp = <Entity extends { entityId: string }>(
       let value: Entity[Prop] = entity[prop];
       Object.defineProperty(entity, prop, {
         enumerable: true,
+        configurable: true,
         get: () => value,
         set: (newValue) => {
           const changed = newValue !== value;
