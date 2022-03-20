@@ -21,7 +21,7 @@ export const appSet = <Entity,>() => {
 
   /** Creates a system and attaches it to the current app. */
   const useSystem = <K extends keyof Entity>(
-    systemDefinition: System<Entity, K>,
+    systemDefinition: Partial<System<Entity, K>>,
   ) => {
     useEffect(() => {
       const app = useApp();
@@ -36,7 +36,7 @@ export const appSet = <Entity,>() => {
    * the system. Optionally also updates when entities are updated.
    */
   const useEntities = <K extends keyof Entity>(
-    systemDefinition: System<Entity, K>,
+    systemDefinition: Partial<System<Entity, K>>,
     refreshOnEntityUpdate = false,
   ) => {
     const app = useApp();
