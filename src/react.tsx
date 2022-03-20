@@ -92,11 +92,9 @@ export const appSet = <Entity,>() => {
           if (changed.current === true) {
             changed.current = false;
 
-            setEntities((entities) => {
-              const temp = nextEntities.current;
-              nextEntities.current = new Set(entities);
-              return temp;
-            });
+            const temp = nextEntities.current;
+            nextEntities.current = new Set(nextEntities.current);
+            setEntities(temp);
 
             setAddedEntities(addedEntitiesRef.current);
             addedEntitiesRef.current = new Set();
