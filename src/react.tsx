@@ -48,7 +48,11 @@ export const appSet = <Entity,>() => {
     const removedEntitiesRef = useRef(
       new Set<Entity & Required<Pick<Entity, K>>>(),
     );
+    const modifiedEntitiesRef = useRef(
+      new Set<Entity & Required<Pick<Entity, K>>>(),
+    );
 
+    const [version, setVersion] = useState(0);
     const [entities, setEntities] = useState<
       ReadonlySet<Entity & Required<Pick<Entity, K>>>
     >(() => new Set<Entity & Required<Pick<Entity, K>>>());
@@ -58,6 +62,9 @@ export const appSet = <Entity,>() => {
     const [removedEntities, setRemovedEntities] = useState<ReadonlySet<Entity>>(
       new Set<Entity>(),
     );
+    const [modifiedEntities, setModifiedEntities] = useState<
+      ReadonlySet<Entity>
+    >(new Set<Entity>());
 
     useEffect(() => {
       const trackSystem = app.addSystem({
@@ -67,6 +74,7 @@ export const appSet = <Entity,>() => {
           nextEntities.current.add(e);
           addedEntitiesRef.current.add(e);
           removedEntitiesRef.current.delete(e);
+          modifiedEntitiesRef.current.delete(e);
           systemDefinition.onAdd?.(e);
         },
         onRemove: (e) => {
@@ -77,11 +85,15 @@ export const appSet = <Entity,>() => {
           addedEntitiesRef.current.delete(e as any);
           // deno-lint-ignore no-explicit-any
           removedEntitiesRef.current.add(e as any);
+          // deno-lint-ignore no-explicit-any
+          modifiedEntitiesRef.current.delete(e as any);
           systemDefinition.onRemove?.(e);
         },
         onChange: refreshOnEntityUpdate
           ? (e) => {
+            if (addedEntitiesRef.current.has(e)) return;
             changed.current = true;
+            modifiedEntitiesRef.current.add(e);
             systemDefinition.onChange?.(e);
           }
           : undefined,
@@ -92,6 +104,8 @@ export const appSet = <Entity,>() => {
           if (changed.current === true) {
             changed.current = false;
 
+            setVersion((version) => version + 1);
+
             const temp = nextEntities.current;
             nextEntities.current = new Set(nextEntities.current);
             setEntities(temp);
@@ -101,6 +115,9 @@ export const appSet = <Entity,>() => {
 
             setRemovedEntities(removedEntitiesRef.current);
             removedEntitiesRef.current = new Set();
+
+            setModifiedEntities(modifiedEntitiesRef.current);
+            modifiedEntitiesRef.current = new Set();
           }
         },
       });
@@ -111,7 +128,13 @@ export const appSet = <Entity,>() => {
       };
     }, systemDefinition.props ?? []);
 
-    return { entities, addedEntities, removedEntities };
+    return {
+      version,
+      entities,
+      addedEntities,
+      removedEntities,
+      modifiedEntities,
+    };
   };
 
   /** Initializes an ECS App and stores it in AppContext. */
