@@ -55,16 +55,16 @@ export const appSet = <Entity,>() => {
     const [version, setVersion] = useState(0);
     const [entities, setEntities] = useState<
       ReadonlySet<Entity & Required<Pick<Entity, K>>>
-    >(() => new Set<Entity & Required<Pick<Entity, K>>>());
+    >(new Set());
     const [addedEntities, setAddedEntities] = useState<
       ReadonlySet<Entity & Required<Pick<Entity, K>>>
-    >(() => new Set<Entity & Required<Pick<Entity, K>>>());
+    >(new Set());
     const [removedEntities, setRemovedEntities] = useState<ReadonlySet<Entity>>(
-      new Set<Entity>(),
+      new Set(),
     );
     const [modifiedEntities, setModifiedEntities] = useState<
-      ReadonlySet<Entity>
-    >(new Set<Entity>());
+      ReadonlySet<Entity & Required<Pick<Entity, K>>>
+    >(new Set());
 
     useEffect(() => {
       const trackSystem = app.addSystem({
