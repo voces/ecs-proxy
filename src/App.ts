@@ -15,7 +15,7 @@ export type App<Entity> = {
   delete: (entity: Entity) => void;
 
   /** Add an entity to the App. */
-  add: (partial: Partial<Entity>) => Entity;
+  add: <T extends Entity>(partial: Partial<T>) => T;
 
   /** Add a system to the App. */
   addSystem: <K extends keyof Entity>(
@@ -142,13 +142,13 @@ export const newApp = <Entity>(
   }
 
   if (!app.add) {
-    app.add = (partialEntity) => {
+    app.add = <T extends Entity>(partialEntity: Partial<T>): T => {
       // Don't add the same entity multiple times
-      if (app.entities.has(partialEntity as Entity)) {
-        return partialEntity as Entity;
+      if (app.entities.has(partialEntity as T)) {
+        return partialEntity as T;
       }
 
-      const entity = app.newEntity(partialEntity, app);
+      const entity = app.newEntity(partialEntity, app) as T;
 
       app.entities.add(entity);
 
