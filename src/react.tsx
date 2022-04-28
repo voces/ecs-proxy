@@ -1,6 +1,5 @@
 import React, {
   createContext,
-  FC,
   useContext,
   useEffect,
   useRef,
@@ -138,15 +137,14 @@ export const appSet = <Entity,>() => {
   };
 
   /** Initializes an ECS App and stores it in AppContext. */
-  const App: FC<
-    Partial<AppType<Entity>> & {
-      newEntity: (
-        partialEntity: Partial<Entity>,
-        app: AppType<Entity>,
-      ) => Entity;
-      initApp?: (app: AppType<Entity>) => void;
-    }
-  > = ({ children, initApp, ...rest }) => {
+  const App = ({ children, initApp, ...rest }: Partial<AppType<Entity>> & {
+    newEntity: (
+      partialEntity: Partial<Entity>,
+      app: AppType<Entity>,
+    ) => Entity;
+    initApp?: (app: AppType<Entity>) => void;
+    children?: React.ReactNode;
+  }) => {
     const [app] = useState(() => newApp(rest));
 
     useEffect(() => {

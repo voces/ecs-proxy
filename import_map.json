@@ -1,5 +1,5 @@
 {
   "imports": {
-    "react": "https://esm.sh/react@17.0.2?pin=70"
+    "react": "https://esm.sh/react@18.1.0?pin=78"
   }
 }
