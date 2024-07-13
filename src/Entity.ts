@@ -1,11 +1,11 @@
-import { App } from "./App.ts";
+import type { App } from "./App.ts";
 
 export const trackProp = <Entity, Prop extends keyof Entity>(
   app: App<Entity>,
   entity: Entity,
   prop: Prop,
   propertyDescriptor?: PropertyDescriptor,
-) => {
+): void => {
   let value: Entity[Prop] | undefined = entity[prop];
   Object.defineProperty(entity, prop, {
     enumerable: true,

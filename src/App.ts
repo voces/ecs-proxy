@@ -1,5 +1,5 @@
-import { System } from "./System.ts";
-import { Mutable } from "./types.ts";
+import type { System } from "./System.ts";
+import type { Mutable } from "./types.ts";
 
 export type App<Entity> = {
   /** Invoke an update. */
@@ -48,7 +48,7 @@ export type App<Entity> = {
 // deno-lint-ignore no-explicit-any
 const apps = new WeakMap<App<any>>();
 
-export const newApp = <Entity>(
+export const newApp = <Entity extends object>(
   partialApp: Partial<App<Entity>> & {
     newEntity: (partialEntity: Partial<Entity>, app: App<Entity>) => Entity;
   },

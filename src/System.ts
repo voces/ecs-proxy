@@ -1,3 +1,9 @@
+export type SystemEntity<T, K extends keyof T> =
+  & {
+    [P in K]-?: NonNullable<T[P]>;
+  }
+  & Omit<T, K>;
+
 export type System<Entity, Props extends keyof Entity> = {
   /**
    * Properties of entities the system is interested in. Required for systems
@@ -6,7 +12,7 @@ export type System<Entity, Props extends keyof Entity> = {
   props?: readonly Props[];
 
   /** Invoked when an entity is added to the system. */
-  onAdd?: (entity: Entity & Required<Pick<Entity, Props>>) => void;
+  onAdd?: (entity: SystemEntity<Entity, Props>) => void;
 
   /** Invoked when an entity is removed from the system. */
   onRemove?: (entity: Entity) => void;
@@ -15,17 +21,17 @@ export type System<Entity, Props extends keyof Entity> = {
    * Invoked each time one of the system-tracked properties of an entity is
    * modified.
    */
-  onChange?: (entity: Entity & Required<Pick<Entity, Props>>) => void;
+  onChange?: (entity: SystemEntity<Entity, Props>) => void;
 
   /** Invoked each update. */
   update?: (delta: number, time: number) => void;
 
   /** Invoked each update for each child of the system. */
   updateChild?: (
-    child: Entity & Required<Pick<Entity, Props>>,
+    child: SystemEntity<Entity, Props>,
     delta: number,
     time: number,
   ) => void;
 
-  entities: Set<Entity & Required<Pick<Entity, Props>>>;
+  entities: Set<SystemEntity<Entity, Props>>;
 };

@@ -1,3 +1,4 @@
+// deno-lint-ignore verbatim-module-syntax
 import React, {
   createContext,
   useContext,
@@ -5,10 +6,47 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { App as AppType, newApp } from "./App.ts";
-import { System } from "./System.ts";
+import { type App as AppType, newApp } from "./App.ts";
+import type { System, SystemEntity } from "./System.ts";
 
-export const appSet = <Entity,>() => {
+type AppSet<Entity> = {
+  /** Instantiates an ECS app and acts a provider for ecs hooks. */
+  App: (
+    props: Partial<AppType<Entity>> & {
+      newEntity: (
+        partialEntity: Partial<Entity>,
+        app: AppType<Entity>,
+      ) => Entity;
+      initApp?: (app: AppType<Entity>) => void;
+      children?: React.ReactNode;
+    },
+  ) => React.JSX.Element;
+
+  /** Installs a system into the current app. */
+  useSystem: <K extends keyof Entity>(
+    systemDefinition: Partial<System<Entity, K>>,
+  ) => void;
+
+  /** A wrapper around useSystem. */
+  useEntities: <K extends keyof Entity>(
+    systemDefinition: Partial<System<Entity, K>>,
+    refreshOnEntityUpdate?: boolean,
+  ) => {
+    version: number;
+    entities: ReadonlySet<SystemEntity<Entity, K>>;
+    addedEntities: ReadonlySet<SystemEntity<Entity, K>>;
+    removedEntities: ReadonlySet<Entity>;
+    modifiedEntities: ReadonlySet<SystemEntity<Entity, K>>;
+  };
+
+  /** Returns the current app. */
+  useApp: () => AppType<Entity>;
+
+  /** The context used by `App` and `useApp`. */
+  AppContext: React.Context<AppType<Entity>>;
+};
+
+export const appSet = <Entity extends object>(): AppSet<Entity> => {
   /** Context that stores the current `App`. */
   const AppContext = createContext<AppType<Entity>>(null!);
 
@@ -40,29 +78,23 @@ export const appSet = <Entity,>() => {
     const app = useApp();
 
     const changed = useRef(false);
-    const nextEntities = useRef(new Set<Entity & Required<Pick<Entity, K>>>());
-    const addedEntitiesRef = useRef(
-      new Set<Entity & Required<Pick<Entity, K>>>(),
-    );
-    const removedEntitiesRef = useRef(
-      new Set<Entity & Required<Pick<Entity, K>>>(),
-    );
-    const modifiedEntitiesRef = useRef(
-      new Set<Entity & Required<Pick<Entity, K>>>(),
-    );
+    const nextEntities = useRef(new Set<SystemEntity<Entity, K>>());
+    const addedEntitiesRef = useRef(new Set<SystemEntity<Entity, K>>());
+    const removedEntitiesRef = useRef(new Set<Entity>());
+    const modifiedEntitiesRef = useRef(new Set<SystemEntity<Entity, K>>());
 
     const [version, setVersion] = useState(0);
     const [entities, setEntities] = useState<
-      ReadonlySet<Entity & Required<Pick<Entity, K>>>
+      ReadonlySet<SystemEntity<Entity, K>>
     >(new Set());
     const [addedEntities, setAddedEntities] = useState<
-      ReadonlySet<Entity & Required<Pick<Entity, K>>>
+      ReadonlySet<SystemEntity<Entity, K>>
     >(new Set());
     const [removedEntities, setRemovedEntities] = useState<ReadonlySet<Entity>>(
       new Set(),
     );
     const [modifiedEntities, setModifiedEntities] = useState<
-      ReadonlySet<Entity & Required<Pick<Entity, K>>>
+      ReadonlySet<SystemEntity<Entity, K>>
     >(new Set());
 
     useEffect(() => {
@@ -72,7 +104,7 @@ export const appSet = <Entity,>() => {
           changed.current = true;
           nextEntities.current.add(e);
           addedEntitiesRef.current.add(e);
-          removedEntitiesRef.current.delete(e);
+          removedEntitiesRef.current.delete(e as Entity);
           modifiedEntitiesRef.current.delete(e);
           systemDefinition.onAdd?.(e);
         },
@@ -150,8 +182,6 @@ export const appSet = <Entity,>() => {
     useEffect(() => {
       initApp?.(app);
     }, []);
-
-    if (!app) return null;
 
     return <AppContext.Provider value={app}>{children}</AppContext.Provider>;
   };

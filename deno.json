@@ -1,0 +1,11 @@
+{
+  "name": "@verit/ecs",
+  "version": "0.5.4",
+  "exports": {
+    ".": "./index.ts",
+    "./react": "./react.tsx"
+  },
+  "imports": {
+    "react": "https://esm.sh/react@18.2.0"
+  }
+}
