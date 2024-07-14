@@ -1,8 +1,13 @@
 import type { System } from "./System.ts";
 import type { Mutable } from "./types.ts";
 
+/** An ECS application that manages entities and systems. */
 export type App<Entity> = {
-  /** Invoke an update. */
+  /**
+   * Trigger an app-wide update, calling all system update functions.
+   * @param delta Milliseconds since last update.
+   * @param next Current timestamp in milliseconds.
+   */
   update: (delta?: number, next?: number) => void;
 
   /** Last time update was called. */
@@ -14,15 +19,15 @@ export type App<Entity> = {
   /** Remove the entity from the app and all systems. */
   delete: (entity: Entity) => void;
 
-  /** Add an entity to the App. */
+  /** Add an entity to the app. */
   add: <T extends Entity>(partial: Partial<T>) => T;
 
-  /** Add a system to the App. */
+  /** Add a system to the app. */
   addSystem: <K extends keyof Entity>(
     partial: Partial<System<Entity, K>>,
   ) => System<Entity, K>;
 
-  /** Remove a system from the App. */
+  /** Remove a system from the app. */
   deleteSystem: <K extends keyof Entity>(system: System<Entity, K>) => void;
 
   /** Initialize a new entity. `partialEntity` should modified and returned. */
@@ -48,6 +53,7 @@ export type App<Entity> = {
 // deno-lint-ignore no-explicit-any
 const apps = new WeakMap<App<any>>();
 
+/** Applies default ECS app methods to the passed partial app. */
 export const newApp = <Entity extends object>(
   partialApp: Partial<App<Entity>> & {
     newEntity: (partialEntity: Partial<Entity>, app: App<Entity>) => Entity;

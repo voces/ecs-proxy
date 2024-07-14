@@ -1,9 +1,14 @@
+/** An Entity with certain properties present. */
 export type SystemEntity<T, K extends keyof T> =
   & {
     [P in K]-?: NonNullable<T[P]>;
   }
   & Omit<T, K>;
 
+/**
+ * A system receives entities based on the presence of properties and operaties
+ * on them.
+ */
 export type System<Entity, Props extends keyof Entity> = {
   /**
    * Properties of entities the system is interested in. Required for systems

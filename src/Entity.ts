@@ -1,5 +1,6 @@
 import type { App } from "./App.ts";
 
+/** Alert `app` and its systems when `prop` changes on `entity`. */
 export const trackProp = <Entity, Prop extends keyof Entity>(
   app: App<Entity>,
   entity: Entity,
