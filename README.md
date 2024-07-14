@@ -122,11 +122,23 @@ const app = newApp<Entity>({
   newEntity: (input) => {
     const entity: Entity = {
       ...input,
-      id: input.id ?? crypto.randomUUID(),
+      id: input.id ?? id(input.unitType),
     };
-    app.trackProp(entity, "position");
-    app.trackProp(entity, "target");
-    return entity;
+    // Track all properties on the entity
+    const proxy = new Proxy(entity as Entity, {
+      set: (target, prop, value) => {
+        if ((target as any)[prop] === value) return true;
+        (target as any)[prop] = value;
+        app.onEntityPropChange(proxy, prop as any);
+        return true;
+      },
+      deleteProperty: (target, prop) => {
+        delete (target as any)[prop];
+        app.onEntityPropChange(proxy, prop as any);
+        return true;
+      },
+    });
+    return proxy;
   },
 });
 ```
