@@ -35,6 +35,7 @@ const app = newApp<Entity>({
 });
 
 // Add a system that reflects the logical entity into a DOM node
+const map = new Map<Entity, HTMLDivElement>();
 app.addSystem({
   // Properties that must be set on the entity to be added to this system
   props: ["position", "sprite"],
@@ -43,23 +44,25 @@ app.addSystem({
     const div = document.createElement("div");
     div.id = entity.id;
     div.classList.add("entity");
-    div.style.background =
-      `url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'><text x='50%' y='50%' font-size='32' text-anchor='middle' dominant-baseline='central'>${entity.sprite}</text></svg>")`;
+    div.textContent = entity.sprite;
     div.style.left = `${entity.position.x}px`;
     div.style.top = `${entity.position.y}px`;
     document.body.appendChild(div);
+    map.set(entity, div);
   },
   // Called when the a tracked property changes on the entity
   onChange: (entity) => {
-    const div = document.getElementById(entity.id);
+    const div = map.get(entity);
     if (!div) return;
     div.style.left = `${entity.position.x}px`;
     div.style.top = `${entity.position.y}px`;
   },
   // Called when a required tracked property is unset
   onRemove: (entity) => {
-    const div = document.getElementById(entity.id);
-    if (div) div.remove();
+    const div = map.get(entity);
+    if (!div) return;
+    div.remove();
+    map.delete(entity);
   },
 });
 
@@ -88,14 +91,25 @@ app.addSystem({
   },
 });
 
-// Spawn a sheep on the right side of the screen that moves leftward
+const animals = [
+  { sprite: "🐎", speed: 75 },
+  { sprite: "🐐", speed: 60 },
+  { sprite: "🐄", speed: 55 },
+  { sprite: "🐖", speed: 50 },
+  { sprite: "🐑", speed: 45 },
+  { sprite: "🐓", speed: 40 },
+  { sprite: "🪿", speed: 35 },
+  { sprite: "🐤", speed: 30 },
+];
+// Spawn animals on the right side of the screen that move leftward
 setInterval(() => {
-  const y = Math.random() * globalThis.innerHeight;
+  const y = Math.random() * (globalThis.innerHeight - 32);
+  const animal = animals[Math.floor(Math.random() * animals.length)];
   app.add({
     position: { x: globalThis.innerWidth, y },
     target: { x: -32, y: y * (0.95 + Math.random() / 10) },
-    movementSpeed: 75 + Math.random() * 50,
-    sprite: "🐑",
+    movementSpeed: animal.speed * (1 + Math.random()),
+    sprite: animal.sprite,
   });
 }, 100);
 
@@ -122,7 +136,7 @@ const app = newApp<Entity>({
   newEntity: (input) => {
     const entity: Entity = {
       ...input,
-      id: input.id ?? id(input.unitType),
+      id: input.id ?? crypto.randomUUID(),
     };
     // Track all properties on the entity
     const proxy = new Proxy(entity as Entity, {
