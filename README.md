@@ -29,12 +29,12 @@ const app = newApp<Entity>({
       set: (target, prop, value) => {
         if ((target as any)[prop] === value) return true;
         (target as any)[prop] = value;
-        app.onEntityPropChange(proxy, prop as any);
+        app.queueEntityChange(proxy, prop as any);
         return true;
       },
       deleteProperty: (target, prop) => {
         delete (target as any)[prop];
-        app.onEntityPropChange(proxy, prop as any);
+        app.queueEntityChange(proxy, prop as any);
         return true;
       },
     });
@@ -51,7 +51,7 @@ is a helper that can set traps for individual properties and automatically
 dispatch changes to the app:
 
 ```ts
-import { newApp } from "ecs-proxy";
+import { newApp } from "jsr:@voces/ecs";
 
 // Define the entity shape
 type Entity = {
@@ -114,7 +114,7 @@ app.addSystem({
 app.addSystem({
   props: ["target"],
   // Called for each child in the entity when calling `app.update`.
-  updateChild: (entity, delta) => {
+  updateEntity: (entity, delta) => {
     if (!entity.position) {
       entity.position = entity.target;
       return delete (entity as Entity).target;
@@ -126,7 +126,7 @@ app.addSystem({
       (entity.target.y - entity.position.y) ** 2) ** 0.5;
     const percent = movement / distance;
 
-    if (percent >= 1) return app.delete(entity);
+    if (percent >= 1) return app.removeEntity(entity);
 
     entity.position = {
       x: entity.position.x * (1 - percent) + entity.target.x * percent,
@@ -149,7 +149,7 @@ const animals = [
 setInterval(() => {
   const y = Math.random() * (globalThis.innerHeight - 32);
   const animal = animals[Math.floor(Math.random() * animals.length)];
-  app.add({
+  app.addEntity({
     position: { x: globalThis.innerWidth, y },
     target: { x: -32, y: y * (0.95 + Math.random() / 10) },
     movementSpeed: animal.speed * (1 + Math.random()),

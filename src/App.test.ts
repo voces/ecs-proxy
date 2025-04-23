@@ -121,7 +121,7 @@ Deno.test("entities are not invalidated within delete and are not temporarily ad
   expect(entity).toEqual({ foo: true, bar: true });
 });
 
-Deno.test("entities are not invalidated within onEntityPropChange", () => {
+Deno.test("entities are not invalidated within queueEntityChange", () => {
   type Entity = { foo?: boolean; bar?: boolean };
   const app = genericApp<Entity>();
   app.addSystem({
