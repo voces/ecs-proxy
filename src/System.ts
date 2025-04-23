@@ -10,33 +10,31 @@ export type SystemEntity<T, K extends keyof T> =
  * on them.
  */
 export type System<Entity, Props extends keyof Entity> = {
-  /**
-   * Properties of entities the system is interested in. Required for systems
-   * to have entities.
-   */
+  /** Which Entity properties this system cares about. */
   props?: readonly Props[];
 
-  /** Invoked when an entity is added to the system. */
+  /** All entities that currently match `props`. */
+  entities: Set<SystemEntity<Entity, Props>>;
+
+  /** Called once when an entity first matches `props`. */
   onAdd?: (entity: SystemEntity<Entity, Props>) => void;
 
-  /** Invoked when an entity is removed from the system. */
+  /** Called once when an entity stops matching `props`. */
   onRemove?: (entity: Entity) => void;
 
   /**
-   * Invoked each time one of the system-tracked properties of an entity is
-   * modified.
+   * Called whenever one of the watched properties changes
+   * on an entity that’s already in the system.
    */
   onChange?: (entity: SystemEntity<Entity, Props>) => void;
 
-  /** Invoked each update. */
+  /** Called once per frame, before `updateEntity`. */
   update?: (delta: number, time: number) => void;
 
-  /** Invoked each update for each child of the system. */
-  updateChild?: (
+  /** Called once per frame for each entity in `entities`. */
+  updateEntity?: (
     child: SystemEntity<Entity, Props>,
     delta: number,
     time: number,
   ) => void;
-
-  entities: Set<SystemEntity<Entity, Props>>;
 };

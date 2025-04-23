@@ -4,7 +4,51 @@ A minimal, unopinionated ECS façade for TS/JS. Does not use arrays of component
 and instead uses plain object with properties with systems that operate on
 presence of properties.
 
-# Example with `trackProp`
+# Example with `Proxy`
+
+If you want to simply track every single property, you can use the built-in
+Proxy to trap all sets and deletes:
+
+```ts
+type Entity = {
+  id: string;
+  position?: { x: number; y: number };
+  readonly sprite?: string;
+  target?: { x: number; y: number };
+  readonly movementSpeed?: number;
+};
+
+const app = newApp<Entity>({
+  initializeEntity: (input) => {
+    const entity: Entity = {
+      ...input,
+      id: input.id ?? crypto.randomUUID(),
+    };
+    // Track all properties on the entity
+    const proxy = new Proxy(entity as Entity, {
+      set: (target, prop, value) => {
+        if ((target as any)[prop] === value) return true;
+        (target as any)[prop] = value;
+        app.onEntityPropChange(proxy, prop as any);
+        return true;
+      },
+      deleteProperty: (target, prop) => {
+        delete (target as any)[prop];
+        app.onEntityPropChange(proxy, prop as any);
+        return true;
+      },
+    });
+    return proxy;
+  },
+});
+```
+
+# Example with `observeProperty`
+
+If you don't want to listen to every property, or don't want to have to deal
+with proxies, you can instead track properties individually. `observeProperty`
+is a helper that can set traps for individual properties and automatically
+dispatch changes to the app:
 
 ```ts
 import { newApp } from "ecs-proxy";
@@ -20,16 +64,16 @@ type Entity = {
 
 // Create an app
 const app = newApp<Entity>({
-  // newEntity must be defined
-  newEntity: (input) => {
+  // initializeEntity must be defined
+  initializeEntity: (input) => {
     // All required properties on Entity must be set
     const entity: Entity = {
       ...input,
       id: input.id ?? crypto.randomUUID(),
     };
     // Track changes to `position` and `target` on the entity
-    app.trackProp(entity, "position");
-    app.trackProp(entity, "target");
+    app.observeProperty(entity, "position");
+    app.observeProperty(entity, "target");
     return entity;
   },
 });
@@ -121,38 +165,24 @@ const animate = () => {
 animate();
 ```
 
-# Example with `Proxy`
+# Atomic dispatch
 
-```ts
-type Entity = {
-  id: string;
-  position?: { x: number; y: number };
-  readonly sprite?: string;
-  target?: { x: number; y: number };
-  readonly movementSpeed?: number;
-};
+Atomic dispatch defers callbacks to other systems until the current system
+callback finishes, so entities never get invalidated mid‑processing.
 
-const app = newApp<Entity>({
-  newEntity: (input) => {
-    const entity: Entity = {
-      ...input,
-      id: input.id ?? crypto.randomUUID(),
-    };
-    // Track all properties on the entity
-    const proxy = new Proxy(entity as Entity, {
-      set: (target, prop, value) => {
-        if ((target as any)[prop] === value) return true;
-        (target as any)[prop] = value;
-        app.onEntityPropChange(proxy, prop as any);
-        return true;
-      },
-      deleteProperty: (target, prop) => {
-        delete (target as any)[prop];
-        app.onEntityPropChange(proxy, prop as any);
-        return true;
-      },
-    });
-    return proxy;
-  },
-});
-```
+**Why it matters**
+
+- Imagine System A's `updateChild` is looping over an entity.
+- It changes a property (`foo`) that System B watches.
+- Normally B's `onChange` would fire right away, and if B then clears a property
+  `bar` that A still needs, A's loop would resume on a broken entity.
+
+With atomic dispatch, B's `onChange` is **deferred** until after A's
+`updateChild` completes. By then, A is done and the world is in a consistent
+state.
+
+**enqueue**
+
+Sometimes you may want to depend on the side-effects of other systems. Since
+other system callbacks are deferred, you need to explicitly wait for
+side-effects to take effect. You can do this using `app.enqueue(fn)`.

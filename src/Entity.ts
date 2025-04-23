@@ -14,7 +14,7 @@ export const trackProp = <Entity, Prop extends keyof Entity>(
     set: (newValue) => {
       const changed = newValue !== value;
       value = newValue;
-      if (changed) app.onEntityPropChange(entity, prop);
+      if (changed) app.queueEntityChange(entity, prop);
     },
     ...propertyDescriptor,
   });
